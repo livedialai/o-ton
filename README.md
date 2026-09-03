@@ -1,4 +1,4 @@
-# Tina-Stack: One-Machine-App — Parakeet ASR + Qwen3.8 Flash LLM + pgvector RAG
+# O-Ton Stack: One-Machine-App — Parakeet ASR + Qwen3.8 Flash LLM + pgvector RAG
 
 > **Idee:** Alles läuft auf **einem** Server (Leaseweb VPS, EU). Audiodaten werden **lokal** transkribiert (NVIDIA Parakeet), die LLM-Aufgaben (Zusammenfassungen, RAG-Antworten) übernimmt ein **günstiges China-LLM** (**Qwen3.8 Flash**) über die API — mit **flachen Preisen, ohne Peak-Aufschläge**. Retrieval und Embeddings liegen in **PostgreSQL + pgvector**. Kein S3, kein Cloud-Transkribierdienst, keine Datenweitergabe: **Local Data Sovereignty** ❤️
 
@@ -41,9 +41,9 @@ apt install -y postgresql-16-pgvector   # Debian/Ubuntu-Paket
 # falls nicht vorhanden: Source-Build siehe https://github.com/pgvector/pgvector
 
 # 3) Datenbank + Rolle anlegen
-sudo -u postgres psql -c "CREATE USER tina WITH PASSWORD 'starkes-passwort';"
-sudo -u postgres psql -c "CREATE DATABASE tina_app OWNER tina;"
-sudo -u postgres psql -d tina_app -c "CREATE EXTENSION IF NOT EXISTS vector;"
+sudo -u postgres psql -c "CREATE USER oton WITH PASSWORD 'starkes-passwort';"
+sudo -u postgres psql -c "CREATE DATABASE oton_app OWNER oton;"
+sudo -u postgres psql -d oton_app -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
 # 4) Ram-Swap wenn nötig (6 GB RAM reichen, aber Sicherheitsnetz)
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
@@ -68,14 +68,14 @@ cd NeMo-Speech.cpp && bash scripts/setup.sh
 # 2) Modell als GGUF (quantisiert, CPU-freundlich) herunterladen — einmalig ca. 700 MB
 hf download nvidia/parakeet-tdt-0.6b-v3 \
   parakeet-tdt-0.6b-v3.q8_0.gguf \
-  --local-dir /opt/tina/models
+  --local-dir /opt/oton/models
 
 # 3) Audio vorbereiten (Whisper/Parakeet-Standard: 16 kHz mono)
 ffmpeg -y -v error -i input.mp4 -ar 16000 -ac 1 /tmp/audio.wav
 
 # 4) Transkription (lokal, kostenlos)
 nemo-speech transcribe /tmp/audio.wav \
-  --model /opt/tina/models/parakeet-tdt-0.6b-v3.q8_0.gguf
+  --model /opt/oton/models/parakeet-tdt-0.6b-v3.q8_0.gguf
 ```
 
 **Alternativen:** NeMo (`nemo_toolkit[asr]`) oder Transformers
@@ -140,7 +140,7 @@ CREATE INDEX ON reden USING hnsw (embedding vector_cosine_ops);
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import create_engine, text
 
-engine = create_engine("postgresql+psycopg://tina:pass@localhost/tina_app")
+engine = create_engine("postgresql+psycopg://oton:pass@localhost/oton_app")
 
 def suchen(query_embedding, k=5):
     with engine.connect() as c:
@@ -225,7 +225,7 @@ Audio-Rohbestand kein Problem, der Cache-Trick hält die LLM-Kosten klein.
 
 ## 7. Betrieb & Sicherheit
 
-- **Backups:** nightly `pg_dump` → `/opt/tina/backup/` → rclone zu Infomaniak kDrive (15 GB reichen locker für DB + Configs).
+- **Backups:** nightly `pg_dump` → `/opt/oton/backup/` → rclone zu Infomaniak kDrive (15 GB reichen locker für DB + Configs).
 - **Secrets:** `.env` lokal, nie ins Repo. `DASHSCOPE_API_KEY` (Alibaba/Qwen), `MISTRAL_API_KEY` (Embeddings/Transkription) + DB-Passwort.
 - **TLS:** Caddy oder nginx + Let's Encrypt vor der FastAPI (`:8000`).
 - **Monitoring:** `pm2` (fastcab-worker-Trick) oder systemd für die Worker + `journalctl`.
