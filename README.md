@@ -76,6 +76,9 @@ ffmpeg -y -v error -i input.mp4 -ar 16000 -ac 1 /tmp/audio.wav
 # 4) Transkription (lokal, kostenlos)
 nemo-speech transcribe /tmp/audio.wav \
   --model /opt/oton/models/parakeet-tdt-0.6b-v3.q8_0.gguf
+
+# 5) Roh-Audio nach erfolgreicher Transkription löschen (wird NICHT archiviert)
+rm /tmp/audio.wav input.mp4
 ```
 
 **Alternativen:** NeMo (`nemo_toolkit[asr]`) oder Transformers
@@ -197,16 +200,15 @@ Selbst mit 3× Sicherheitsfaktor: < 0,20 €/Monat.
 
 **Embeddings (Mistral Embed, $0.10/1M):** ≈ 7 Cent €/Monat — praktisch vernachlässigbar.
 
-### Speicherplan (100 GB NVMe, bei ~50 h Audio/Monat)
+### Speicherplan (100 GB NVMe, ~50 h Audio/Monat)
+**Roh-Audio wird nach der Transkription gelöscht** — gespeichert wird nur der Text:
 | Was | Größe/Monat | 100 GB reichen für |
 |---|---|---|
-| Audio-Rohdateien MP3 128 kbps | ~2,8 GB | ~36 Monate |
-| Audio als m4a 64 kbps (Empfehlung: einmalig re-encoden) | ~1,4 GB | ~73 Monate ≈ 6 Jahre |
 | Transkript-Text (390k Wörter) | ~2,5 MB | unbegrenzt |
 | PostgreSQL + pgvector (inkl. 1024-dim Vektoren) | <1 GB/Jahr | unbegrenzt |
+| Backup (pg_dump komprimiert) | ~0,5 GB/Jahr (nach Infomaniak 15 GB) | Jahrzehnte |
 
-→ Tipp: Beim Import Audio nach `ffmpeg -i in.mp4 -c:a aac -b:a 64k -ac 1 archiv.m4a` wandeln;
-Video/Kamera-Originale nur bei Bedarf behalten (Original-MP4 ≈ 10 GB/Monat > Jahresbudget).
+→ 100 GB NVMe sind damit massiv überdimensioniert — auch das kleinere Modell des Leaseweb-VPS (z. B. „L") reicht locker. Die 30 TB Traffic sind genauso unkritisch (nur Text-API-Verkehr).
 
 ### Gesamtkosten
 | Szenario | €/Monat | €/Jahr |
