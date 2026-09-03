@@ -233,7 +233,7 @@ Audio-Rohbestand kein Problem, der Cache-Trick hält die LLM-Kosten klein.
 
 ---
 
-## 8. Roadmap für Tina
+## 8. Roadmap (Umsetzungs-Schritte)
 
 - [ ] Leaseweb VPS + Ubuntu 24.04 provisionieren
 - [ ] PostgreSQL 16 + pgvector (Abschnitt 2)
