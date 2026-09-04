@@ -12,9 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import init_db, insert_speech
 from llm import llm_chat, embed_text
 
-RSS_URL = "https://webtv.bundestag.de/player/macros/bttv/podcast/video/plenar.xml"
-NEMO = "/opt/oton/NeMo-Speech.cpp/build/bin/nemo-speech"
-MODEL = "/opt/oton/models/parakeet-tdt-0.6b-v3.q8_0.gguf"
+RSS_URL = "https://webtv.bundestag.de/player/macros/bttp/podcast/video/plenar.xml"
+ASR_URL = "http://127.0.0.1:5092/v1/audio/transcriptions"
 WORK = "/opt/oton/work"
 
 
@@ -47,22 +46,21 @@ def parse_title(title):
 
 
 def transcribe_audio(wav):
-    """Parakeet via nemo-speech -> Liste {start, end, text}"""
-    segs = []
+    """Parakeet ASR-Server (achteronic/parakeet, ONNX-int8) -> Liste {start, end, text}"""
     p = subprocess.run(
-        [NEMO, "transcribe", wav, "--model", MODEL, "--output", "/dev/stdout", "--timestamps"],
-        capture_output=True, text=True, timeout=7200,
+        ["curl", "-s", "--max-time", "1800", "-F", f"file=@{wav}",
+         "-F", "model=parakeet", "-F", "response_format=json", ASR_URL],
+        capture_output=True, text=True, timeout=1800,
     )
-    out = p.stdout or ""
-    for line in out.splitlines():
-        m = re.match(r"\[\s*(\d+\.?\d*)\s*-\s*(\d+\.?\d*)\]\s*(.*)", line)
-        if m:
-            segs.append({"start": float(m.group(1)), "end": float(m.group(2)), "text": m.group(3).strip()})
-        elif line.strip():
-            segs.append({"start": 0.0, "end": 0.0, "text": line.strip()})
-    if not segs:
-        print("WARN: keine Segmente von nemo-speech; stdout head:", out[:300])
-    return segs
+    try:
+        d = json.loads(p.stdout)
+    except Exception:
+        print("WARN: ASR-Response unparsebar:", p.stdout[:200])
+        return []
+    text = (d.get("text") or "").strip()
+    if not text:
+        return []
+    return [{"start": 0.0, "end": 0.0, "text": text}]
 
 
 def main():
@@ -84,6 +82,14 @@ def main():
         meta = parse_title(it["title"])
         if not meta:
             print("SKIP (Titel nicht parsebar):", it["title"][:90])
+            continue
+        # Dedupe: bereits importierte Medien überspringen
+        import psycopg
+        from db import get_conn
+        with get_conn() as c:
+            exists = c.execute("SELECT 1 FROM speeches WHERE media_url=%s", (it["media"],)).fetchone()
+        if exists:
+            print("SKIP (schon importiert):", meta["speaker"], meta["date"])
             continue
         # Existiert schon?
         os.makedirs(WORK, exist_ok=True)

@@ -8,6 +8,9 @@ from pydantic import BaseModel
 
 from db import get_conn
 from llm import llm_chat, embed_text
+from db import init_db
+
+init_db()
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 app = FastAPI(title="O-Ton Stack", docs_url="/api/docs")
