@@ -198,7 +198,9 @@ Selbst mit 3× Sicherheitsfaktor: < 0,20 €/Monat.
 **LLM gesamt: ≈ 4,55 €/Monat = ca. 4,70 $ — unter dem 5-$-Budget** ✓
 (Mit Batch-API −50 %: ≈ 2,20 €/Monat)
 
-**Embeddings (Mistral Embed, $0.10/1M):** ≈ 7 Cent €/Monat — praktisch vernachlässigbar.
+**Embeddings (Mistral Embed, $0.10/1M) — nur für den Index-Aufbau:**
+Wird **einmalig beim Import** der Transkripte erzeugt (~0,5 M Tokens/Monat → ~5 Cent €/Monat).
+Die Suche selbst braucht nur ein Mini-Embedding pro Anfrage (~25 Tokens) — praktisch 0 Cent.
 
 ### Speicherplan (100 GB NVMe, ~50 h Audio/Monat)
 **Roh-Audio wird nach der Transkription gelöscht** — gespeichert wird nur der Text:
