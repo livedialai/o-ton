@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O-Ton — Bundestagsreden, verständlich gemacht</title>
+<style>
+  :root { --pink:#ff5da2; --purple:#7c4dff; --teal:#21d4d4; --ink:#17173a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--ink); background:#f6f5ff; }
+  .hero { padding:70px 20px 110px; text-align:center; color:#fff;
+    background:linear-gradient(120deg,#ff5da2 0%,#7c4dff 55%,#21d4d4 100%); }
+  .hero h1 { font-size:2.9rem; letter-spacing:-.02em; text-shadow:0 2px 14px rgba(0,0,0,.18); }
+  .hero p { margin-top:10px; font-size:1.15rem; opacity:.95; }
+  .badges { margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .badge { background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.45);
+    padding:6px 14px; border-radius:999px; font-size:.85rem; backdrop-filter:blur(4px); }
+  .searchwrap { max-width:720px; margin:-55px auto 0; padding:0 20px; }
+  .searchbar { display:flex; background:#fff; border-radius:18px; overflow:hidden;
+    box-shadow:0 18px 45px rgba(60,30,120,.22); }
+  .searchbar input { flex:1; border:0; outline:0; padding:18px 22px; font-size:1.05rem; }
+  .searchbar button { border:0; cursor:pointer; padding:0 28px; font-size:1.05rem; font-weight:700; color:#fff;
+    background:linear-gradient(120deg,#7c4dff,#21d4d4); }
+  .answer { max-width:760px; margin:26px auto; background:#fff; border-radius:16px; padding:24px 28px;
+    box-shadow:0 10px 30px rgba(60,30,120,.12); display:none; border-left:6px solid var(--purple); }
+  .answer.show { display:block; }
+  .answer h3 { color:var(--purple); margin-bottom:10px; }
+  .answer p { line-height:1.6; }
+  .hits { max-width:760px; margin:12px auto 0; font-size:.9rem; color:#655f8f; }
+  section { max-width:1000px; margin:50px auto 20px; padding:0 20px; }
+  section h2 { color:#5a4f9e; font-size:1.35rem; margin-bottom:16px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
+  .card { background:#fff; border-radius:16px; padding:20px 22px; box-shadow:0 8px 24px rgba(60,30,120,.10);
+    border-top:5px solid #7c4dff; transition:transform .15s ease, box-shadow .15s ease; }
+  .card:nth-child(6n+2){ border-top-color:#ff5da2; } .card:nth-child(6n+3){ border-top-color:#21d4d4; }
+  .card:nth-child(6n+4){ border-top-color:#ffb13d; } .card:nth-child(6n+5){ border-top-color:#37d67a; }
+  .card:nth-child(6n+6){ border-top-color:#5d8dff; }
+  .card:hover { transform:translateY(-4px); box-shadow:0 16px 36px rgba(60,30,120,.18); }
+  .card .who { font-weight:800; font-size:1.05rem; }
+  .card .party { display:inline-block; margin:4px 0 10px; font-size:.75rem; font-weight:700;
+    color:#fff; background:linear-gradient(120deg,#7c4dff,#ff5da2); padding:3px 10px; border-radius:999px; }
+  .card .sum { font-size:.92rem; line-height:1.55; color:#3d3a5c; }
+  .card .meta { margin-top:12px; font-size:.78rem; color:#8a86ad; }
+  .chip { display:inline-block; padding:5px 12px; margin:6px 6px 0 0; border-radius:999px;
+    font-size:.78rem; font-weight:600; background:#ede9ff; color:#5a4f9e; cursor:pointer; }
+  footer { text-align:center; padding:40px 20px 60px; color:#8a86ad; font-size:.85rem; }
+  a { color:var(--purple); }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>🎙️ O-Ton</h1>
+  <p>Bundestagsreden — transkribiert, zusammengefasst, durchsuchbar.</p>
+  <div class="badges">
+    <span class="badge">🤖 KI-frei zusammengefasst</span>
+    <span class="badge">🏛️ Offizielle Bundestags-Aufnahmen</span>
+    <span class="badge">🔎 Fragen statt Suchen</span>
+  </div>
+</div>
+
+<div class="searchwrap">
+  <form class="searchbar" onsubmit="return ask(event)">
+    <input id="q" placeholder="Frag was — z. B. „Was sagt die Opposition zur Energiepolitik?" required>
+    <button type="submit">Fragen</button>
+  </form>
+  <div class="answer" id="answer"><h3>💡 Antwort</h3><p id="answerText"></p></div>
+  <div class="hits" id="hits"></div>
+</div>
+
+<section>
+  <h2>🗓️ Neueste Reden</h2>
+  <div class="cards" id="cards"><p>Lade Daten…</p></div>
+</section>
+
+<footer>
+  Powered by <b>O-Ton Stack</b> · Parakeet-ASR (lokal) · GLM-5.3-Flash · pgvector · Mistral-Embed · Daten: Deutscher Bundestag
+</footer>
+
+<script>
+async function ask(ev) {
+  ev.preventDefault();
+  const q = document.getElementById('q').value;
+  const box = document.getElementById('answer'), txt = document.getElementById('answerText');
+  box.classList.add('show'); txt.textContent = 'Denke nach… 🤔';
+  try {
+    const r = await fetch('/api/search', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question: q})});
+    const d = await r.json();
+    txt.textContent = d.answer;
+    document.getElementById('hits').textContent =
+      (d.hits||[]).map(h => h.speaker + ' (' + h.party + ')').join(' · ') || '';
+  } catch(e) { txt.textContent = 'Fehler beim Suchen: ' + e; }
+  return false;
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/speeches?limit=30');
+    const d = await r.json();
+    const el = document.getElementById('cards');
+    if (!d.speeches.length) { el.innerHTML = '<p>Noch keine Reden — Import läuft gleich an…</p>'; return; }
+    el.innerHTML = d.speeches.map(s => `
+      <div class="card">
+        <div class="who">${s.speaker}</div>
+        <span class="party">${s.party || 'Bundestag'}</span>
+        <div class="sum">${s.summary ? s.summary.split('\n')[0] : ''}</div>
+        <div class="meta">📅 ${s.speech_date} · ⚡ Themen: ${(s.summary||'').split('Themen:')[1] || '—'}</div>
+      </div>`).join('');
+  } catch(e) { document.getElementById('cards').innerHTML = '<p>Fehler: ' + e + '</p>'; }
+}
+load();
+</script>
+</body>
+</html>
