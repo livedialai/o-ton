@@ -193,7 +193,8 @@ Das Plenum des Deutschen Bundestags debattiert im langen Durchschnitt **≈ 38�
 Selbst mit 3× Sicherheitsfaktor: < 0,20 €/Monat.
 
 **Nutzung — RAG-Suchanfragen (großzügig: 10.000 Besucher-Anfragen/Monat):**
-= 20,0 M Input / 6,0 M Output → **≈ 4,35 €/Monat**
+Die **Vektorsuche selbst kostet 0 €** (pgvector läuft auf dem VPS, enthalten in den Fixkosten).
+Bezahlt wird nur, was an die LLM-API geht: Kontext + Antwort = 20,0 M Input / 6,0 M Output → **≈ 4,19 €/Monat**
 
 **LLM gesamt: ≈ 4,55 €/Monat = ca. 4,70 $ — unter dem 5-$-Budget** ✓
 (Mit Batch-API −50 %: ≈ 2,20 €/Monat)
