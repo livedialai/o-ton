@@ -222,6 +222,15 @@ Die Suche selbst braucht nur ein Mini-Embedding pro Anfrage (~25 Tokens) — pra
 | Embeddings (Mistral Embed) | **0,07 €** | **0,84 €** |
 | Cloud-Speicher | **0,00 €** (Infomaniak 15 GB für Backups) | **0,00 €** |
 
+### Einmalige Aufbaukosten (Backkatalog → RAG-Index)
+Embedding (Mistral, inkl. 1,5× Chunk-Overhead) + rückwirkende Zusammenfassungen (Qwen):
+| Backkatalog | Einmalig gesamt | mit Batch-API (−50 %) |
+|---|---|---|
+| 1.000 Reden | **≈ 0,50 €** | 0,25 € |
+| 5.000 Reden | **≈ 2,50 €** | 1,25 € |
+| 10.000 Reden | **≈ 5,00 €** | 2,50 € |
+pgvector-Index, PostgreSQL und Parakeet-Transkription: **0 €** (auf dem VPS).
+
 **Ergebnis:** Die komplette App — lokale Transkription, RAG-Chat, Zusammenfassungen — läuft für
 **unter 10 €/Monat gesamt (davon LLM < 5 $/Monat)**. Mit 100 GB NVMe und 30 TB Traffic ist der
 Audio-Rohbestand kein Problem, der Cache-Trick hält die LLM-Kosten klein.
