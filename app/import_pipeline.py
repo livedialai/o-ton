@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import init_db, insert_speech
 from llm import llm_chat, embed_text
 
-RSS_URL = "https://webtv.bundestag.de/player/macros/bttp/podcast/video/plenar.xml"
+RSS_URL = "https://webtv.bundestag.de/player/macros/bttv/podcast/video/plenar.xml"
 ASR_URL = "http://127.0.0.1:5092/v1/audio/transcriptions"
 WORK = "/opt/oton/work"
 

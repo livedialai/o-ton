@@ -73,8 +73,18 @@
 </div>
 
 <section>
-  <h2>🗓️ Neueste Reden</h2>
+  <h2>🗓️ Reden</h2>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:6px;">
+    <div id="datechips" style="display:flex;gap:8px;overflow-x:auto;"></div>
+    <input type="date" id="cal" style="padding:8px 10px;border-radius:12px;border:1px solid #ccc;font-size:.9rem;background:#fff;" title="Kalender" onchange="setDate()">
+    <button onclick="clearDate()" style="border:0;background:#eee;border-radius:12px;padding:8px 12px;cursor:pointer;font-size:.85rem;">✕</button>
+  </div>
   <div class="cards" id="cards"><p>Lade Daten…</p></div>
+  <div style="display:flex;justify-content:center;gap:12px;margin-top:22px;">
+    <button id="prevBtn" onclick="page(-1)" style="border:0;background:#f0edff;color:#5a4f9e;border-radius:12px;padding:10px 18px;cursor:pointer;font-weight:700;">← Zurück</button>
+    <span id="pageInfo" style="align-self:center;color:#8a86ad;font-size:.9rem;">Seite 1</span>
+    <button id="nextBtn" onclick="page(1)" style="border:0;background:linear-gradient(120deg,var(--red),var(--gold));color:#fff;border-radius:12px;padding:10px 18px;cursor:pointer;font-weight:700;">Weiter →</button>
+  </div>
 </section>
 
 <footer>
@@ -98,22 +108,51 @@ async function ask(ev) {
   return false;
 }
 
-async function load() {
+let curPage = 1, curDate = null;
+
+async function loadDates() {
   try {
-    const r = await fetch('/api/speeches?limit=30');
+    const r = await fetch('/api/dates');
+    const d = await r.json();
+    const el = document.getElementById('datechips');
+    el.innerHTML = d.dates.map(x => {
+      const label = x.slice(8,10) + '.' + x.slice(5,7) + '.' + x.slice(2,4);
+      return `<button onclick="pick('${x}')" style="border:1px solid #e2deff;background:${x===curDate?'#7c4dff':'#fff'};color:${x===curDate?'#fff':'#5a4f9e'};border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:.85rem;white-space:nowrap;">${label}</button>`;
+    }).join('');
+  } catch(e) { console.log('dates', e); }
+}
+
+function pick(d) { curDate = (curDate===d) ? null : d; curPage = 1; refresh(); }
+function setDate() {
+  const v = document.getElementById('cal').value;
+  if (v) { curDate = v; curPage = 1; refresh(); }
+}
+function clearDate() { curDate = null; curPage = 1; document.getElementById('cal').value=''; refresh(); }
+function page(d) { curPage += d; refresh(); }
+
+async function refresh() {
+  try {
+    const url = `/api/speeches?limit=30&page=${curPage}` + (curDate ? '&date=' + curDate : '');
+    const r = await fetch(url);
     const d = await r.json();
     const el = document.getElementById('cards');
-    if (!d.speeches.length) { el.innerHTML = '<p>Noch keine Reden — Import läuft gleich an…</p>'; return; }
+    if (!d.speeches.length) { el.innerHTML = '<p>Keine Reden für diese Auswahl — Import läuft noch/neu importieren…</p>'; }
+    else {
     el.innerHTML = d.speeches.map(s => `
       <div class="card">
         <div class="who">${s.speaker}</div>
         <span class="party">${s.party || 'Bundestag'}</span>
         <div class="sum">${s.summary ? s.summary.split('\n')[0] : ''}</div>
-        <div class="meta">📅 ${s.speech_date} · ⚡ Themen: ${(s.summary||'').split('Themen:')[1] || '—'}</div>
+        <div class="meta">📅 ${s.speech_date}${s.speech_time ? ' · 🕐 ' + String(s.speech_time).slice(0,5) : ''} · ⚡ Themen: ${(s.summary||'').split('Themen:')[1] || '—'}</div>
       </div>`).join('');
+    }
+    document.getElementById('pageInfo').textContent = 'Seite ' + curPage + ' von ' + Math.max(1, Math.ceil((d.total||0)/30));
+    document.getElementById('prevBtn').disabled = curPage <= 1;
+    document.getElementById('nextBtn').disabled = curPage * 30 >= (d.total||0);
+    loadDates();
   } catch(e) { document.getElementById('cards').innerHTML = '<p>Fehler: ' + e + '</p>'; }
 }
-load();
+refresh();
 </script>
 </body>
 </html>

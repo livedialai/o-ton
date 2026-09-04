@@ -27,14 +27,37 @@ def index():
 
 
 @app.get("/api/speeches")
-def speeches(limit: int = 40):
+def speeches(limit: int = 30, page: int = 1, date: str = None, speaker: str = None,
+             party: str = None, q: str = None):
+    where, args = [], []
+    if date:
+        where.append("speech_date = %s"); args.append(date)
+    if speaker:
+        where.append("speaker ILIKE %s"); args.append(f"%{speaker}%")
+    if party:
+        where.append("party ILIKE %s"); args.append(f"%{party}%")
+    if q:
+        where.append("(summary ILIKE %s OR transcript ILIKE %s)"); args += [f"%{q}%", f"%{q}%"]
+    w = "WHERE " + " AND ".join(where) if where else ""
+    offset = (page - 1) * limit
+    with get_conn() as c:
+        total = c.execute(f"SELECT count(*) FROM speeches {w}", args).fetchone()["count"]
+        rows = c.execute(
+            f"""SELECT id, speaker, party, title, speech_date, speech_time, summary, created_at
+                FROM speeches {w} ORDER BY speech_date DESC, speech_time DESC LIMIT %s OFFSET %s""",
+            args + [limit, offset],
+        ).fetchall()
+    return {"speeches": [dict(r) for r in rows], "total": total, "page": page, "limit": limit}
+
+
+@app.get("/api/dates")
+def dates():
     with get_conn() as c:
         rows = c.execute(
-            """SELECT id, speaker, party, title, speech_date, summary, created_at
-               FROM speeches ORDER BY speech_date DESC, speech_time DESC LIMIT %s""",
-            (limit,),
+            "SELECT DISTINCT speech_date FROM speeches WHERE speech_date IS NOT NULL "
+            "ORDER BY speech_date DESC LIMIT 60"
         ).fetchall()
-    return {"speeches": [dict(r) for r in rows]}
+    return {"dates": [str(r["speech_date"]) for r in rows]}
 
 
 @app.get("/api/speeches/{sid}")
