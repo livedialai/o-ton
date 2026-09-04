@@ -156,7 +156,8 @@ def suchen(query_embedding, k=5):
 
 **Embeddings: Mistral Embed** (`mistral-embed`, 1024-dim, EU, Zero Data Retention)
 - **Preis: $0.10 / 1M Tokens** (Batch: $0.05), passt perfekt zu `VECTOR(1024)` oben.
-- Kosten: 50 h Sprache/Monat ≈ 0,46 M Text-Tokens (+ Chunk-Overhead) → **≈ 7 Cent €/Monat**
+- **Embeddet werden nur die Zusammenfassungen** (`summary`), NICHT die Rohtexte — die Vektorsuche findet dann die passende Zusammenfassung.
+- Kosten: 500 Zusammenfassungen/Monat ≈ 300k Tokens (mit 1,5× Chunk-Overhead) → **≈ 3 Cent €/Monat**
 - SQL: `INSERT ... embedding :=>'[...]'` — pgvector nimmt die 1024-dim Mistral-Vektoren direkt.
 
 ```python
@@ -199,8 +200,8 @@ Bezahlt wird nur, was an die LLM-API geht: Kontext + Antwort = 20,0 M Input / 6,
 **LLM gesamt: ≈ 4,55 €/Monat = ca. 4,70 $ — unter dem 5-$-Budget** ✓
 (Mit Batch-API −50 %: ≈ 2,20 €/Monat)
 
-**Embeddings (Mistral Embed, $0.10/1M) — nur für den Index-Aufbau:**
-Wird **einmalig beim Import** der Transkripte erzeugt (~0,5 M Tokens/Monat → ~5 Cent €/Monat).
+**Embeddings (Mistral Embed, $0.10/1M) — nur die Zusammenfassungen, nur für den Index:**
+Beim Import werden **nur die 500 Zusammenfassungen/Monat embeddet** (~300k Tokens → **≈ 3 Cent €/Monat**).
 Die Suche selbst braucht nur ein Mini-Embedding pro Anfrage (~25 Tokens) — praktisch 0 Cent.
 
 ### Speicherplan (100 GB NVMe, ~50 h Audio/Monat)
@@ -224,11 +225,11 @@ Die Suche selbst braucht nur ein Mini-Embedding pro Anfrage (~25 Tokens) — pra
 
 ### Einmalige Aufbaukosten (Backkatalog → RAG-Index)
 Embedding (Mistral, inkl. 1,5× Chunk-Overhead) + rückwirkende Zusammenfassungen (Qwen):
-| Backkatalog | Einmalig gesamt | mit Batch-API (−50 %) |
+| Backkatalog (nur Zusammenfassungen embedden) | Einmalig gesamt | mit Batch-API (−50 %) |
 |---|---|---|
-| 1.000 Reden | **≈ 0,50 €** | 0,25 € |
-| 5.000 Reden | **≈ 2,50 €** | 1,25 € |
-| 10.000 Reden | **≈ 5,00 €** | 2,50 € |
+| 1.000 Reden | **≈ 0,37 €** | 0,18 € |
+| 5.000 Reden | **≈ 1,84 €** | 0,92 € |
+| 10.000 Reden | **≈ 3,67 €** | 1,84 € |
 pgvector-Index, PostgreSQL und Parakeet-Transkription: **0 €** (auf dem VPS).
 
 **Ergebnis:** Die komplette App — lokale Transkription, RAG-Chat, Zusammenfassungen — läuft für
