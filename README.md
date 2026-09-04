@@ -243,7 +243,7 @@ Audio-Rohbestand kein Problem, der Cache-Trick hält die LLM-Kosten klein.
 - **Secrets:** `.env` lokal, nie ins Repo. `DEEPINFRA_API_KEY` (Mistral Small 24B), `MISTRAL_API_KEY` (Embeddings/Transkription) + DB-Passwort.
 - **TLS:** Caddy oder nginx + Let's Encrypt vor der FastAPI (`:8000`).
 - **Monitoring:** `pm2` (fastcab-worker-Trick) oder systemd für die Worker + `journalctl`.
-- **DSGVO:** Audiomaterial und Transkripte bleiben auf dem EU-VPS; nur Texte gehen (nach Bedarf) an die LLM-API (DeepInfra/Mistral) — üblicher API-Verarbeitungsfall, kein Training auf deinen Daten.
+- **DSGVO:** Unkritisch — die Reden sind **öffentliche Plenarprotokolle** (kein Personen-/Schutzgut). Der EU-VPS bleibt trotzdem Master; die LLM-API bekommt nur öffentlichen Text. Bei Nutzer-Fragen gilt Standard-API-Verarbeitung (keine gespeicherten Nutzerdaten).
 
 ---
 
