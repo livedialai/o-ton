@@ -29,7 +29,13 @@
 
 ---
 
-## 2. Server-Setup (Leaseweb VPS, Ubuntu 24.04, Root)
+## 2. Server-Setup (Ubuntu, Root) — Ziel: oton.lol → 45.131.109.251
+
+**Deployment-Ziel:** Domain `oton.lol` (Spaceship, ~3,60 €/Jahr) mit A-Record auf den
+Build-VPS **45.131.109.251** (3,8 GB RAM, 49 GB Disk → für den O-Ton-Stack: ASR 2 GB + PG 0,5–1 GB +
+Rest ~0,8 GB = passt knapp, aber mit Swap-Limit 2 GB; Parakeet-GGUF 700 MB rein). Für den
+Produktivbetrieb mit mehr RAM die Leaseweb-Kiste (6 GB) daneben nehmen — VPS 2 ist hier nur
+der erste Dev-Lauf.
 
 ```bash
 # 1) System aktualisieren
