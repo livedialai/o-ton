@@ -1,6 +1,6 @@
-# O-Ton Stack: One-Machine-App — Parakeet ASR + Qwen3.8 Flash LLM + pgvector RAG
+# O-Ton Stack: One-Machine-App — Parakeet ASR + Mistral Small 24B LLM + pgvector RAG
 
-> **Idee:** Alles läuft auf **einem** Server (Leaseweb VPS, EU). Audiodaten werden **lokal** transkribiert (NVIDIA Parakeet), die LLM-Aufgaben (Zusammenfassungen, RAG-Antworten) übernimmt ein **günstiges China-LLM** (**Qwen3.8 Flash**) über die API — mit **flachen Preisen, ohne Peak-Aufschläge**. Retrieval und Embeddings liegen in **PostgreSQL + pgvector**. Kein S3, kein Cloud-Transkribierdienst, keine Datenweitergabe: **Local Data Sovereignty** ❤️
+> **Idee:** Alles läuft auf **einem** Server (Leaseweb VPS, EU). Audiodaten werden **lokal** transkribiert (NVIDIA Parakeet), die LLM-Aufgaben (Zusammenfassungen, RAG-Antworten) übernimmt ein **offenes Modell** (**Mistral Small 3 / 24B**, Apache 2.0) über die DeepInfra-API — **$0.05 in / $0.08 out je 1M**, flach und billig. Retrieval und Embeddings liegen in **PostgreSQL + pgvector**. Kein S3, kein Cloud-Transkribierdienst: **Local Data Sovereignty** ❤️
 
 ---
 
@@ -15,7 +15,7 @@
 │                                   PostgreSQL 16 + pgvector    ◀─── Embeddings (API, billig)      │
 │                                     (Reden, Segmente, Vektoren, Cache, Usage)                     │
 │                                            ▲                                                     │
-│  [Website/Bot] ──▶ FastAPI-Backend ──▶ Qwen3.8 Flash API ──▶ Zusammenfassung / RAG-Antwort       │
+│  [Website/Bot] ──▶ FastAPI-Backend ──▶ Mistral Small 24B (DeepInfra) ──▶ Zusammenfassung / RAG   │
 │                           └──────── umschreibt Skripte/Tasks (cron)                              │
 │                                                                                                  │
 │  Backups: 15 GB Infomaniak kDrive (rclone) — keine Cloud-Fremdkosten                             │
@@ -87,30 +87,29 @@ rm /tmp/audio.wav input.mp4
 
 ---
 
-## 4. LLM: Qwen3.8 Flash (günstig, China — durchgehend flacher Preis)
+## 4. LLM: Mistral Small 3 / 24B via DeepInfra (offen, billig, flach)
 
-- Modell: `qwen3.8-flash` (OpenAI-kompatibel; Alibaba Model Studio)
-- **Preise (offizielle Liste Alibaba, Stand 01.09.2026 — flach, keine Peak-Zeiten):**
-  | Deployment-Scope | Input / 1M Tokens | Output / 1M Tokens |
+- Modell: `mistralai/Mistral-Small-24B-Instruct-2501` (Apache 2.0, 32k Kontext, multilingual inkl. Deutsch, 24B — konkurriert mit 70B-Modellen, 3× schneller)
+- **Preise DeepInfra (flach, keine Peak-Zeiten, Stand 09/2026):**
+  | Tier | Input / 1M Tokens | Output / 1M Tokens |
   |---|---|---|
-  | **Global** *(verwendete Basis)* | **$0.113** | **$0.382** |
-  | International (Singapur) | $0.15 | $0.47 |
-- 125B MoE / 6B aktiv, 1M Kontext, multimodal — stark genug für Zusammenfassungen & RAG. Zusatztrick: Batch-API (asynchrone Verarbeitung von Zusammenfassungs-Jobs) = **−50 %** → $0.0565/$0.191, sofern im Region aktiv.
-- **Preis ist Tag und Nacht gleich** — ideal für Cron-Jobs, wann immer sie laufen.
-- 6-GB-VPS ist nur der Client: Die LLM-Rechenleistung liegt bei Alibaba, wir zahlen nur Tokens.
+  | **Standard** *(verwendete Basis)* | **$0.05** | **$0.08** |
+  | Flex (0,8×, nur für async Batch-Jobs) | $0.04 | $0.064 |
+- Gegenüber Qwen3.8 Flash (Global $0.113/$0.382): **Output 4,8× billiger**, Input 2,3× billiger — und das Modell ist offen (Apache 2.0), kein Vendor-Lock-in.
+- **Preis Tag und Nacht gleich** — ideal für Cron-Jobs. 6-GB-VPS ist nur der Client.
 
 ```python
 # app/llm.py — Minimalbeispiel
 from openai import OpenAI  # pip install openai
 
 client = OpenAI(
-    api_key=os.environ["DASHSCOPE_API_KEY"],          # Key siehe README Abschnitt 7
-    base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    api_key=os.environ["DEEPINFRA_API_KEY"],          # Key siehe README Abschnitt 7
+    base_url="https://api.deepinfra.com/v1/openai",
 )
 
 def zusammenfassen(rede_text: str) -> str:
     resp = client.chat.completions.create(
-        model="qwen3.8-flash",
+        model="mistralai/Mistral-Small-24B-Instruct-2501",
         messages=[
             {"role": "system", "content": "Du fasst Bundestagsreden neutral und knapp zusammen."},
             {"role": "user", "content": rede_text[:30000]},
@@ -187,18 +186,18 @@ v = resp.data[0].embedding        # 1024 floats
 Das Plenum des Deutschen Bundestags debattiert im langen Durchschnitt **≈ 38–45 h/Monat** (3 Plenartage pro Sitzungswoche, sitzungsfreie Wochen ohne Plenum).
 → Bei ~6 min pro Rede sind das **≈ 400–430 Reden/Monat** — großzügig wird mit **500 Reden/Monat** gerechnet.
 
-### LLM-Kosten (Qwen3.8 Flash Global: $0.113 Input / $0.382 Output je 1M)
+### LLM-Kosten (Mistral Small 24B via DeepInfra: $0.05 Input / $0.08 Output je 1M)
 **Grundlast — Zusammenfassungen (einmalig erzeugt, im Cache):** Direkte Umrechnung der Sprache in Tokens:
 42 h Audio/Monat ≈ 2.520 min × ~130 Wörter/min ≈ **330.000 Wörter ≈ 0,46 M Tokens** (deutsch ≈ 1,4 Tokens/Wort)
-+ System-Prompt-Overhead ≈ **0,53 M Tokens Input** + ~0,22 M Output → **≈ 0,13 €/Monat** (unter 15 Cent!)
-Selbst mit 3× Sicherheitsfaktor: < 0,20 €/Monat.
++ System-Prompt-Overhead ≈ **0,53 M Tokens Input** + ~0,22 M Output → **≈ 0,04 €/Monat** (4 Cent!)
+Selbst mit 3× Sicherheitsfaktor: < 0,15 €/Monat.
 
 **Nutzung — RAG-Suchanfragen (großzügig: 10.000 Besucher-Anfragen/Monat):**
 Die **Vektorsuche selbst kostet 0 €** (pgvector läuft auf dem VPS, enthalten in den Fixkosten).
-Bezahlt wird nur, was an die LLM-API geht: Kontext + Antwort = 20,0 M Input / 6,0 M Output → **≈ 4,19 €/Monat**
+Bezahlt wird nur, was an die LLM-API geht: Kontext + Antwort = 20,0 M Input / 6,0 M Output → **≈ 1,36 €/Monat**
 
-**LLM gesamt: ≈ 4,55 €/Monat = ca. 4,70 $ — unter dem 5-$-Budget** ✓
-(Mit Batch-API −50 %: ≈ 2,20 €/Monat)
+**LLM gesamt: ≈ 1,40 €/Monat = ca. 1,50 $ — unter dem 5-$-Budget** ✓
+(Mit Flex-Tier 0,8×: ≈ 1,12 €/Monat)
 
 **Embeddings (Mistral Embed, $0.10/1M) — nur die Zusammenfassungen, nur für den Index:**
 Beim Import werden **nur die 500 Zusammenfassungen/Monat embeddet** (~300k Tokens → **≈ 3 Cent €/Monat**).
@@ -217,23 +216,23 @@ Die Suche selbst braucht nur ein Mini-Embedding pro Anfrage (~25 Tokens) — pra
 ### Gesamtkosten
 | Szenario | €/Monat | €/Jahr |
 |---|---|---|
-| **A) Großzügig (alle Reden + 10.000 RAG-Queries)** | **≈ 9,40 €** | **≈ 112,80 €** |
-| **B) nur Zusammenfassungen (500 Reden, kein Query-Verkehr)** | **≈ 5,00 €** | **≈ 60,00 €** |
+| **A) Großzügig (alle Reden + 10.000 RAG-Queries)** | **≈ 6,20 €** | **≈ 74,40 €** |
+| **B) nur Zusammenfassungen (500 Reden, kein Query-Verkehr)** | **≈ 4,85 €** | **≈ 58,20 €** |
 | ASR (Parakeet lokal) | **0,00 €** | **0,00 €** |
-| Embeddings (Mistral Embed) | **0,07 €** | **0,84 €** |
+| Embeddings (Mistral Embed) | **0,03 €** | **0,36 €** |
 | Cloud-Speicher | **0,00 €** (Infomaniak 15 GB für Backups) | **0,00 €** |
 
 ### Einmalige Aufbaukosten (Backkatalog → RAG-Index)
-Embedding (Mistral, inkl. 1,5× Chunk-Overhead) + rückwirkende Zusammenfassungen (Qwen):
-| Backkatalog (nur Zusammenfassungen embedden) | Einmalig gesamt | mit Batch-API (−50 %) |
+Embedding (Mistral, inkl. 1,5× Chunk-Overhead) + rückwirkende Zusammenfassungen (Mistral Small):
+| Backkatalog (nur Zusammenfassungen embedden) | Einmalig gesamt | mit Flex-Tier (0,8×) |
 |---|---|---|
-| 1.000 Reden | **≈ 0,37 €** | 0,18 € |
-| 5.000 Reden | **≈ 1,84 €** | 0,92 € |
-| 10.000 Reden | **≈ 3,67 €** | 1,84 € |
+| 1.000 Reden | **≈ 0,17 €** | 0,09 € |
+| 5.000 Reden | **≈ 0,85 €** | 0,43 € |
+| 10.000 Reden | **≈ 1,69 €** | 0,85 € |
 pgvector-Index, PostgreSQL und Parakeet-Transkription: **0 €** (auf dem VPS).
 
 **Ergebnis:** Die komplette App — lokale Transkription, RAG-Chat, Zusammenfassungen — läuft für
-**unter 10 €/Monat gesamt (davon LLM < 5 $/Monat)**. Mit 100 GB NVMe und 30 TB Traffic ist der
+**unter 6,50 €/Monat gesamt (davon LLM ≈ 1,50 $/Monat)**. Mit 100 GB NVMe und 30 TB Traffic ist der
 Audio-Rohbestand kein Problem, der Cache-Trick hält die LLM-Kosten klein.
 
 ---
@@ -241,10 +240,10 @@ Audio-Rohbestand kein Problem, der Cache-Trick hält die LLM-Kosten klein.
 ## 7. Betrieb & Sicherheit
 
 - **Backups:** nightly `pg_dump` → `/opt/oton/backup/` → rclone zu Infomaniak kDrive (15 GB reichen locker für DB + Configs).
-- **Secrets:** `.env` lokal, nie ins Repo. `DASHSCOPE_API_KEY` (Alibaba/Qwen), `MISTRAL_API_KEY` (Embeddings/Transkription) + DB-Passwort.
+- **Secrets:** `.env` lokal, nie ins Repo. `DEEPINFRA_API_KEY` (Mistral Small 24B), `MISTRAL_API_KEY` (Embeddings/Transkription) + DB-Passwort.
 - **TLS:** Caddy oder nginx + Let's Encrypt vor der FastAPI (`:8000`).
 - **Monitoring:** `pm2` (fastcab-worker-Trick) oder systemd für die Worker + `journalctl`.
-- **DSGVO:** Audiomaterial und Transkripte bleiben auf dem EU-VPS; nur Texte gehen (nach Bedarf) an Alibaba QwenCloud — üblicher API-Verarbeitungsfall, kein Training auf deinen Daten.
+- **DSGVO:** Audiomaterial und Transkripte bleiben auf dem EU-VPS; nur Texte gehen (nach Bedarf) an die LLM-API (DeepInfra/Mistral) — üblicher API-Verarbeitungsfall, kein Training auf deinen Daten.
 
 ---
 
